@@ -3,69 +3,81 @@ from fastapi_poe.types import QueryRequest, SettingsRequest, SettingsResponse
 import os
 import google.generativeai as genai
 
+
 class ContentGeneratorBot(PoeBot):
-    
+
     def __init__(self):
         super().__init__()
+
         api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
-            self.client = genai.Client(api_key=api_key)
-        else:
-            self.client = None
-    
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY not set")
+
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel("gemini-1.5-flash")
+
     async def get_response(self, request: QueryRequest):
-        yield self.text_event("✨ ")
-        
-        user_message = request.query[-1].content
-        content_type = self.detect_content_type(user_message)
-        
-        if not self.client:
-            yield self.error_event("Bot not configured properly")
+        yield self.text_event("✨ Generating content...\n\n")
+
+        if not request.query:
+            yield self.error_event("No input received")
             return
-        
+
+        user_message = request.query[-1].content.strip()
+        content_type = self.detect_content_type(user_message)
         prompt = self.build_prompt(content_type, user_message)
-        
+
         try:
-            response = self.client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
-            
+            response = self.model.generate_content(prompt)
             yield self.text_event(response.text)
             yield self.text_event("\n\n💡 Want another version? Just ask!")
-            
+
         except Exception as e:
-            yield self.error_event(f"Error: {str(e)}")
-    
-    def detect_content_type(self, message):
-        message_lower = message.lower()
-        if "linkedin" in message_lower:
+            yield self.error_event(f"Gemini Error: {str(e)}")
+
+    def detect_content_type(self, message: str):
+        message = message.lower()
+        if "linkedin" in message:
             return "LinkedIn Post"
-        elif "instagram" in message_lower:
+        if "instagram" in message:
             return "Instagram Caption"
-        elif "email" in message_lower:
+        if "email" in message:
             return "Email Copy"
-        elif "product" in message_lower:
+        if "product" in message:
             return "Product Description"
-        else:
-            return "Content"
-    
+        return "General Content"
+
     def build_prompt(self, content_type, user_input):
-        prompts = {
-            "LinkedIn Post": f"Create a professional LinkedIn post about: {user_input}. Include hashtags.",
-            "Instagram Caption": f"Write an Instagram caption for: {user_input}. Include emojis and 10 hashtags.",
-            "Email Copy": f"Write email copy about: {user_input}. Include subject line.",
-            "Product Description": f"Write a compelling product description for: {user_input}."
-        }
-        return prompts.get(content_type, f"Create engaging content about: {user_input}")
-    
+        return {
+            "LinkedIn Post":
+                f"Create a professional LinkedIn post about:\n{user_input}\nInclude hashtags.",
+            "Instagram Caption":
+                f"Write an Instagram caption with emojis and 10 hashtags for:\n{user_input}",
+            "Email Copy":
+                f"Write a professional email with subject line about:\n{user_input}",
+            "Product Description":
+                f"Write a persuasive product description for:\n{user_input}",
+            "General Content":
+                f"Create engaging content about:\n{user_input}",
+        }[content_type]
+
     async def get_settings(self, setting: SettingsRequest) -> SettingsResponse:
         return SettingsResponse(
-            server_bot_dependencies={},
             allow_attachments=False,
-            introduction_message="👋 Welcome to Content Studio AI!\n\nI create:\n📱 LinkedIn Posts\n📸 Instagram Captions\n📧 Email Copy\n🛍️ Product Descriptions\n\nJust tell me what you need!",
+            introduction_message=(
+                "👋 Welcome to Content Studio AI!\n\n"
+                "I can generate:\n"
+                "📱 LinkedIn Posts\n"
+                "📸 Instagram Captions\n"
+                "📧 Email Copy\n"
+                "🛍️ Product Descriptions\n\n"
+                "Just tell me what you need!"
+            ),
         )
 
+
 if __name__ == "__main__":
-    access_key = os.environ.get("POE_ACCESS_KEY", "")
-    run(ContentGeneratorBot(), access_key=access_key)
+    run(
+        ContentGeneratorBot(),
+        access_key=os.environ["POE_ACCESS_KEY"]
+    )
