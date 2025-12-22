@@ -10,28 +10,30 @@ class ContentGeneratorBot(PoeBot):
         api_key = os.environ.get("GEMINI_API_KEY")
         if api_key:
             self.client = genai.Client(api_key=api_key)
-            self.model_name = 'gemini-2.0-flash-exp'
         else:
             self.client = None
     
     async def get_response(self, request: QueryRequest):
+        yield self.text_event("✨ ")
+        
         user_message = request.query[-1].content
         content_type = self.detect_content_type(user_message)
         
-        yield self.text_event(f"Generating your {content_type}...\n\n")
-        
         if not self.client:
-            yield self.error_event("API not configured")
+            yield self.error_event("Bot not configured properly")
             return
         
         prompt = self.build_prompt(content_type, user_message)
         
         try:
             response = self.client.models.generate_content(
-                model=self.model_name,
+                model='gemini-1.5-flash',
                 contents=prompt
             )
+            
             yield self.text_event(response.text)
+            yield self.text_event("\n\n💡 Want another version? Just ask!")
+            
         except Exception as e:
             yield self.error_event(f"Error: {str(e)}")
     
@@ -51,19 +53,27 @@ class ContentGeneratorBot(PoeBot):
     def build_prompt(self, content_type, user_input):
         prompts = {
             "LinkedIn Post": f"Create a professional LinkedIn post about: {user_input}. Include hashtags.",
-            "Instagram Caption": f"Write an Instagram caption for: {user_input}. Include emojis and hashtags.",
+            "Instagram Caption": f"Write an Instagram caption for: {user_input}. Include emojis and 10 hashtags.",
             "Email Copy": f"Write email copy about: {user_input}. Include subject line.",
-            "Product Description": f"Write a product description for: {user_input}."
+            "Product Description": f"Write a compelling product description for: {user_input}."
         }
-        return prompts.get(content_type, f"Create content about: {user_input}")
+        return prompts.get(content_type, f"Create engaging content about: {user_input}")
     
     async def get_settings(self, setting: SettingsRequest) -> SettingsResponse:
         return SettingsResponse(
             server_bot_dependencies={},
             allow_attachments=False,
-            introduction_message="Welcome to Content Studio AI! I create LinkedIn Posts, Instagram Captions, Email Copy, and Product Descriptions.",
+            introduction_message="👋 Welcome to Content Studio AI!\n\nI create:\n📱 LinkedIn Posts\n📸 Instagram Captions\n📧 Email Copy\n🛍️ Product Descriptions\n\nJust tell me what you need!",
         )
 
 if __name__ == "__main__":
     access_key = os.environ.get("POE_ACCESS_KEY", "")
     run(ContentGeneratorBot(), access_key=access_key)
+```
+
+---
+
+## `requirements.txt`
+```
+fastapi-poe==0.0.36
+google-genai
