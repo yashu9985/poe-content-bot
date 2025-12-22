@@ -1,7 +1,7 @@
 from fastapi_poe import PoeBot, run
 from fastapi_poe.types import QueryRequest, SettingsRequest, SettingsResponse
 import os
-import google.generativeai as genai
+from google import genai
 
 class ContentGeneratorBot(PoeBot):
     
