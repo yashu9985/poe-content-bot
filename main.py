@@ -9,10 +9,10 @@ class ContentGeneratorBot(PoeBot):
         super().__init__()
         api_key = os.environ.get("GEMINI_API_KEY")
         if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            self.client = genai.Client(api_key=api_key)
+            self.model_name = 'gemini-2.0-flash-exp'
         else:
-            self.model = None
+            self.client = None
     
     async def get_response(self, request: QueryRequest):
         user_message = request.query[-1].content
@@ -20,14 +20,17 @@ class ContentGeneratorBot(PoeBot):
         
         yield self.text_event(f"Generating your {content_type}...\n\n")
         
-        if not self.model:
+        if not self.client:
             yield self.error_event("API not configured")
             return
         
         prompt = self.build_prompt(content_type, user_message)
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             yield self.text_event(response.text)
         except Exception as e:
             yield self.error_event(f"Error: {str(e)}")
