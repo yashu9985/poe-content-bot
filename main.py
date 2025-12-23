@@ -1,4 +1,4 @@
-from fastapi_poe import PoeBot, run
+from fastapi_poe import PoeBot, make_app
 from fastapi_poe.types import QueryRequest, SettingsRequest, SettingsResponse
 import os
 from groq import Groq
@@ -74,5 +74,12 @@ class ContentGeneratorBot(PoeBot):
         )
 
 if __name__ == "__main__":
+    import sys
     access_key = os.environ.get("POE_ACCESS_KEY", "")
-    run(ContentGeneratorBot(), access_key=access_key)
+    port = int(os.environ.get("PORT", 8080))
+    
+    bot = ContentGeneratorBot()
+    app = make_app(bot, access_key=access_key)
+    
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=port)
